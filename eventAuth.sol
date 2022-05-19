@@ -1,8 +1,9 @@
 //SPDX-License-Identifier: MIT
 pragma solidity ^0.8.7;
-import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/token/ERC20/extensions/ERC20Burnable.sol";
 import "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
+import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
+
 
 /**
  * @title EventAuth
@@ -31,7 +32,7 @@ contract EventAuth is ReentrancyGuard {
     }
 // functions
 
-    function grantAccess() external returns(bytes32 _authID){
+    function grantAccess() external nonReentrant() returns(bytes32 _authID){
         address _eventCreator = msg.sender;
         // check if event creator is authorized
         require(token.allowance(_eventCreator, address(this)) >= eventPrice, "You must pay rxg to grant access to post an event.");
@@ -58,13 +59,15 @@ contract EventAuth is ReentrancyGuard {
         authorized[msg.sender][_authID] = false;
         // remove authID from authorizedIDs
         authorizedIDs.remove(_authID);
+        emit EventRevoked(_authID, msg.sender);
         return true;
     }
 
     function checkAccess(bytes32 _authID) external view returns(bool _success){
         // check if authID is in authorizedIDs
-        require(authorizedIDs.contains(_authID), "ID does not exist.");
-        require(authorized[msg.sender][_authID], "You are not authorized.");
+        if(!authorized[msg.sender][_authID]){
+            return false;
+        }
         return true;
     }
 
