@@ -29,7 +29,7 @@ contract Tacvue721a is ERC721A, Ownable {
     string private _emptyURI = "";
 
     mapping(address => uint256) public walletMints; // number of times an address has minted
-    mapping(uint256 => string) public tokenURIs; // URI of the token
+    mapping(uint256 => string) private tokenURIs; // URI of the token
     mapping(address => bool) public WhiteList; // token id to token URI
 
     constructor(string memory _name, string memory _ticker, uint256 _maxMints, uint256 _maxSupply, uint256 _mintPrice, uint256 _wlPrice, string memory _placeholderURI) ERC721A(_name, _ticker){
@@ -43,14 +43,15 @@ contract Tacvue721a is ERC721A, Ownable {
     function mint(uint256 quantity) external payable {
         require(saleIsActive != wlActive, "Minting Has Been Disabled");
         require(totalSupply() + quantity <= MAX_SUPPLY, "Max Supply Reached");
-        require(msg.value >= (mintPrice * quantity), "Not enough Avax sent");
         walletMints[msg.sender] += quantity;
         require(walletMints[msg.sender] <= MAX_MINTS, "Max mints reached, lower amount to mint");
         if (wlActive) {
             require(WhiteList[msg.sender], "Not whitelisted");
+            require(msg.value >= (WLprice * quantity), "Not enough Avax sent");
             _safeMint(msg.sender, quantity);
         } else {
             require(saleIsActive, "Sale not active");
+            require(msg.value >= (mintPrice * quantity), "Not enough Avax sent");
             _safeMint(msg.sender, quantity);
         }
     }
@@ -70,6 +71,7 @@ contract Tacvue721a is ERC721A, Ownable {
     }
 
     function saleActiveSwitch() public onlyOwner {
+        if (wlActive){ wlActive = false;}
         saleIsActive = !saleIsActive;
     }
 
