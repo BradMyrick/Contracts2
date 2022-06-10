@@ -23,21 +23,21 @@ contract Tacvue721a is ERC721A, Ownable {
     uint256 public MAX_SUPPLY; 
     uint256 public mintPrice;   
     uint256 public WLprice;     
-    string public _PlaceHolderURI;
+    string public baseURI;
     bool public wlActive = false;
     bool public saleIsActive = false;
-    string private _emptyURI = "";
+    address public feeCollector;
 
     mapping(address => uint256) public walletMints; // number of times an address has minted
-    mapping(uint256 => string) private tokenURIs; // URI of the token
     mapping(address => bool) public WhiteList; // token id to token URI
 
-    constructor(string memory _name, string memory _ticker, uint256 _maxMints, uint256 _maxSupply, uint256 _mintPrice, uint256 _wlPrice, string memory _placeholderURI) ERC721A(_name, _ticker){
+    constructor(string memory _name, string memory _ticker, uint256 _maxMints, uint256 _maxSupply, uint256 _mintPrice, uint256 _wlPrice, string memory _placeholderURI, address _feeCollector) ERC721A(_name, _ticker){
         MAX_MINTS = _maxMints;
         MAX_SUPPLY = _maxSupply;
         mintPrice = _mintPrice;
         WLprice = _wlPrice;
-        _PlaceHolderURI = _placeholderURI;
+        baseURI = _placeholderURI;
+        feeCollector = _feeCollector;
     }
 
     function mint(uint256 quantity) external payable {
@@ -56,41 +56,50 @@ contract Tacvue721a is ERC721A, Ownable {
         }
     }
 
+    // add a single new address to the whitelist
     function addToWhiteList(address _addr) external onlyOwner {
         require(!WhiteList[_addr], "Already whitelisted");
         WhiteList[_addr] = true;
+    }
+
+    // Bulk WhiteListing add up to 100 addresses at a time to the whitelist
+    function bulkWhitelistAdd(address[] calldata _addrs) external onlyOwner returns(bool success) {
+        require(_addrs.length <= 50, "Looping sucks on chain, use less than 50 addresses");
+        for (uint i = 0; i < _addrs.length; i++) {
+            if (!WhiteList[_addrs[i]]) {
+                WhiteList[_addrs[i]] = true;
+            }
+        }
+        return true;
     }
 
     function removeFromWhiteList(address _addr) external onlyOwner {
         require(WhiteList[_addr], "Not whitelisted");
         WhiteList[_addr] = false;
     }
-
-    function withdraw() external payable onlyOwner {
-        payable(owner()).transfer(address(this).balance);
+    // withdraw all tokens from the contract to the owner
+    function withdraw() external onlyOwner {
+        // send 2% of the total supply to the fee collector
+        uint256 fee = address(this).balance * 2 / 100;
+        payable(feeCollector).transfer(fee);
+        payable(owner()).transfer(address(this).balance - fee);
     }
-
+    // toggle the sale status
     function saleActiveSwitch() public onlyOwner {
         if (wlActive){ wlActive = false;}
         saleIsActive = !saleIsActive;
     }
-
+    // function to toggle the whitelist on and off
     function WlActiveSwitch() public onlyOwner {
         wlActive = !wlActive;
     }
 
-    // take a list of token URIs and set them as the token URIs for all tokens   
-    // To seal this function revoke ownership after reveal is complete
-    function setTokenURIs(uint256[] calldata _ids,string[] calldata _tokenURIs) public onlyOwner {
-        require(_ids.length == _tokenURIs.length, "Length of ids and URIs must match");
-        for (uint256 i = 0; i < _ids.length; i++) {
-            tokenURIs[_ids[i]] = _tokenURIs[i];
-        }
+    // function to set the base URI for the token
+    function setBaseURI(string memory _URI) public onlyOwner {
+        baseURI = _URI;
     }
-    // Ovveride the ERC721A function to get the URI of the token
-    function tokenURI(uint256 _tokenId) public view virtual override returns (string memory) {
-        if (!_exists(_tokenId)) revert URIQueryForNonexistentToken();
-        if (abi.encodePacked(tokenURIs[_tokenId]).length == 0) return _PlaceHolderURI;
-        else {return tokenURIs[_tokenId];}
-    } 
+    // override the _baseURI function in ERC721A
+    function _baseURI() override internal view virtual returns (string memory) {
+        return baseURI;
+    }
 }
