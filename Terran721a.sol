@@ -17,8 +17,10 @@ pragma solidity ^0.8.7;
 
 import "github.com/chiru-labs/ERC721A/contracts/ERC721A.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
+import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 
-contract Tacvue721a is ERC721A, Ownable {
+
+contract Tacvue721a is ERC721A, Ownable, ReentrancyGuard {
     uint256 public MAX_MINTS; 
     uint256 public MAX_SUPPLY; 
     uint256 public mintPrice;   
@@ -40,7 +42,7 @@ contract Tacvue721a is ERC721A, Ownable {
         feeCollector = _feeCollector;
     }
 
-    function mint(uint256 quantity) external payable {
+    function mint(uint256 quantity) external payable nonReentrant {
         require(saleIsActive != wlActive, "Minting Has Been Disabled");
         require(totalSupply() + quantity <= MAX_SUPPLY, "Max Supply Reached");
         walletMints[msg.sender] += quantity;
@@ -54,16 +56,17 @@ contract Tacvue721a is ERC721A, Ownable {
             require(msg.value >= (mintPrice * quantity), "Not enough Avax sent");
             _safeMint(msg.sender, quantity);
         }
+        emit Mint(msg.sender, quantity);
     }
 
     // add a single new address to the whitelist
-    function addToWhiteList(address _addr) external onlyOwner {
+    function addToWhiteList(address _addr) external onlyOwner nonReentrant {
         require(!WhiteList[_addr], "Already whitelisted");
         WhiteList[_addr] = true;
     }
 
     // Bulk WhiteListing add up to 100 addresses at a time to the whitelist
-    function bulkWhitelistAdd(address[] calldata _addrs) external onlyOwner returns(bool success) {
+    function bulkWhitelistAdd(address[] calldata _addrs) external onlyOwner nonReentrant returns(bool success) {
         require(_addrs.length <= 50, "Looping sucks on chain, use less than 50 addresses");
         for (uint i = 0; i < _addrs.length; i++) {
             if (!WhiteList[_addrs[i]]) {
@@ -73,33 +76,37 @@ contract Tacvue721a is ERC721A, Ownable {
         return true;
     }
 
-    function removeFromWhiteList(address _addr) external onlyOwner {
+    function removeFromWhiteList(address _addr) external onlyOwner nonReentrant {
         require(WhiteList[_addr], "Not whitelisted");
         WhiteList[_addr] = false;
     }
     // withdraw all tokens from the contract to the owner
-    function withdraw() external onlyOwner {
+    function withdraw() external onlyOwner nonReentrant {
         // send 2% of the total supply to the fee collector
         uint256 fee = address(this).balance * 2 / 100;
         payable(feeCollector).transfer(fee);
         payable(owner()).transfer(address(this).balance - fee);
     }
     // toggle the sale status
-    function saleActiveSwitch() public onlyOwner {
+    function saleActiveSwitch() external onlyOwner nonReentrant {
         if (wlActive){ wlActive = false;}
         saleIsActive = !saleIsActive;
     }
     // function to toggle the whitelist on and off
-    function WlActiveSwitch() public onlyOwner {
+    function WlActiveSwitch() external onlyOwner nonReentrant {
         wlActive = !wlActive;
     }
 
     // function to set the base URI for the token
-    function setBaseURI(string memory _URI) public onlyOwner {
+    function setBaseURI(string memory _URI) external onlyOwner nonReentrant {
         baseURI = _URI;
     }
     // override the _baseURI function in ERC721A
     function _baseURI() override internal view virtual returns (string memory) {
         return baseURI;
     }
+
+// events
+    event CollectionMinted(address indexed sender, uint256 indexed quantity);
+
 }
