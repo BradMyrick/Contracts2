@@ -70,6 +70,16 @@ contract ENTITY1155 is Context, ERC1155Burnable, Ownable {
         _mint(msg.sender, RARE, 1, data);
     }
 
+    function mintCommon() external payable {
+        // only 1 per wallet
+        require(balanceOf(msg.sender, COMMON) == 0, "You already have a common");
+        require(MintIsLive[COMMON] == true, "Minting is not live");
+        require(msg.value == CommonPrice, "You must pay the correct price");
+        CommonSupply++;
+        bytes memory data = abi.encodePacked(CommonSupply);
+        _mint(msg.sender, COMMON, 1, data);
+    }
+
     // set the minting to live or not live
     function setMinting(uint256 _tokenId, bool _live) external onlyOwner() {
         MintIsLive[_tokenId] = _live;
