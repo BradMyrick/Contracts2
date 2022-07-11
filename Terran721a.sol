@@ -33,6 +33,10 @@ contract Tacvue721a is ERC721A, Ownable, ReentrancyGuard {
     mapping(address => uint256) public walletMints; // number of times an address has minted
     mapping(address => bool) public WhiteList; // token id to token URI
 
+    event WlAdded(address indexed _addr);
+    event WlRemoved(address indexed _addr);
+    event Withdrawal(address indexed _addr, uint256 indexed _amount);
+
     constructor(string memory _name, string memory _ticker, uint256 _maxMints, uint256 _maxSupply, uint256 _mintPrice, uint256 _wlPrice, string memory _placeholderURI, address _feeCollector) ERC721A(_name, _ticker){
         MAX_MINTS = _maxMints;
         MAX_SUPPLY = _maxSupply;
@@ -56,13 +60,13 @@ contract Tacvue721a is ERC721A, Ownable, ReentrancyGuard {
             require(msg.value >= (mintPrice * quantity), "Not enough Avax sent");
             _safeMint(msg.sender, quantity);
         }
-        emit Mint(msg.sender, quantity);
     }
 
     // add a single new address to the whitelist
     function addToWhiteList(address _addr) external onlyOwner nonReentrant {
         require(!WhiteList[_addr], "Already whitelisted");
         WhiteList[_addr] = true;
+        emit WlAdded(_addr);
     }
 
     // Bulk WhiteListing add up to 100 addresses at a time to the whitelist
@@ -71,6 +75,7 @@ contract Tacvue721a is ERC721A, Ownable, ReentrancyGuard {
         for (uint i = 0; i < _addrs.length; i++) {
             if (!WhiteList[_addrs[i]]) {
                 WhiteList[_addrs[i]] = true;
+                emit WlAdded(_addrs[i]);
             }
         }
         return true;
@@ -79,26 +84,32 @@ contract Tacvue721a is ERC721A, Ownable, ReentrancyGuard {
     function removeFromWhiteList(address _addr) external onlyOwner nonReentrant {
         require(WhiteList[_addr], "Not whitelisted");
         WhiteList[_addr] = false;
+        emit WlRemoved(_addr);
     }
     // withdraw all tokens from the contract to the owner
     function withdraw() external onlyOwner nonReentrant {
         // send 2% of the total supply to the fee collector
+        require(address(this).balance > 100 wei, "Not enough Avax to withdraw");
         uint256 fee = address(this).balance * 2 / 100;
+
         payable(feeCollector).transfer(fee);
         payable(owner()).transfer(address(this).balance - fee);
+
+        emit Withdrawal(address(this), fee);
     }
     // toggle the sale status
-    function saleActiveSwitch() external onlyOwner nonReentrant {
+    function saleActiveSwitch() external onlyOwner {
         if (wlActive){ wlActive = false;}
         saleIsActive = !saleIsActive;
     }
     // function to toggle the whitelist on and off
-    function WlActiveSwitch() external onlyOwner nonReentrant {
+    function WlActiveSwitch() external onlyOwner {
+        if (saleIsActive){ saleIsActive = false;}
         wlActive = !wlActive;
     }
 
     // function to set the base URI for the token
-    function setBaseURI(string memory _URI) external onlyOwner nonReentrant {
+    function setBaseURI(string memory _URI) external onlyOwner {
         baseURI = _URI;
     }
     // override the _baseURI function in ERC721A
