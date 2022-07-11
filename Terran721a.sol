@@ -50,7 +50,9 @@ contract Tacvue721a is ERC721A, Ownable, ReentrancyGuard {
         require(saleIsActive != wlActive, "Minting Has Been Disabled");
         require(totalSupply() + quantity <= MAX_SUPPLY, "Max Supply Reached");
         walletMints[msg.sender] += quantity;
-        require(walletMints[msg.sender] <= MAX_MINTS, "Max mints reached, lower amount to mint");
+        if (MAX_MINTS != 0){
+            require(walletMints[msg.sender] <= MAX_MINTS, "Max mints reached, lower amount to mint");
+        }
         if (wlActive) {
             require(WhiteList[msg.sender], "Not whitelisted");
             require(msg.value >= (WLprice * quantity), "Not enough Avax sent");
