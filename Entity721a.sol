@@ -3,7 +3,7 @@ pragma solidity ^0.8.7;
 
 library StringCheck {
     /// @dev Does a byte-by-byte lexicographical comparison of two strings.
-    /// @return a negative number if `_a` is smaller, zero if they are equal
+    /// return a negative number if `_a` is smaller, zero if they are equal
     /// and a positive numbe if `_b` is smaller.
     function _compare(string memory _a, string memory _b) internal pure returns (int) {
         bytes memory a = bytes(_a);
@@ -29,7 +29,6 @@ library StringCheck {
     }
 }
 
-
 import "github.com/chiru-labs/ERC721A/contracts/ERC721A.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
@@ -42,10 +41,10 @@ import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
  */
 
 contract Entity721a is ERC721A, Ownable, ReentrancyGuard { 
-    uint256 public MAX_SUPPLY; 
-    string public placeHolderURI;
+    bool public mintLive; 
+    string public placeHolderURI = "https://tacvue.io/placeholder.png"; // todo: replace placeholder fake link
 
-    // token uri mapping
+    /// @dev token uri mapping
     mapping(uint256 => string) public tokenURIs;
 
     modifier onlyTokenOwner(uint256 _tokenId) {
@@ -53,26 +52,32 @@ contract Entity721a is ERC721A, Ownable, ReentrancyGuard {
         _;
     }
 
-    constructor(uint256 _maxSupply, string memory _placeholderURI) ERC721A("Genesis Entity", "TVGE"){
-        MAX_SUPPLY = _maxSupply;
-        placeHolderURI = _placeholderURI;
+    constructor() ERC721A("Genesis Entity", "TVGE"){
+        mintLive = true;
     }
 
     function mint(uint256 quantity) external nonReentrant {
+        require(mintLive, "Minting is nolonger live");
         // only one entity can be held by a wallet
         require(balanceOf(msg.sender) == 0, "You already have a genesis");
             _safeMint(msg.sender, quantity);
     }
 
-    // function to set the token URI for a minted token
+    /// @dev function to set the token URI for a minted token
     function setTokenURI(string memory _URI, uint256 _tokenId) external onlyTokenOwner(_tokenId) {
         require(StringCheck.equal(tokenURIs[_tokenId], placeHolderURI), "You can only set the URI for a token once");
         tokenURIs[_tokenId] = _URI;       
     }
 
-    // override the tokenURI function in ERC721A
+    /// @dev override the tokenURI function in ERC721A
     function tokenURI(uint256 _tokenId) override public view returns (string memory) {
         return tokenURIs[_tokenId];
+    }
+
+    /// @dev disable mint permanently
+    // todo: switch to deadman switch, not permanently disabled this way for testing purposes
+    function disableMint() external onlyOwner {
+        MintLive = !MintLive;
     }
 
 }
